@@ -1,14 +1,119 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Exit the Maze</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <canvas id="gameCanvas"></canvas>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/PointerLockControls.js"></script>
-  <script src="main.js"></script>
-</body>
-</html>
+import React, { useRef, useEffect, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+
+function Player({ position, setPosition }) {
+  const speed = 0.1;
+  const keys = useRef({});
+  
+  useEffect(() => {
+    const handleKeyDown = (e) => (keys.current[e.key] = true);
+    const handleKeyUp = (e) => (keys.current[e.key] = false);
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  useFrame(() => {
+    let [x, y, z] = position;
+    if (keys.current["w"]) z -= speed;
+    if (keys.current["s"]) z += speed;
+    if (keys.current["a"]) x -= speed;
+    if (keys.current["d"]) x += speed;
+    setPosition([x, y, z]);
+  });
+
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.2, 32, 32]} />
+      <meshStandardMaterial color="blue" />
+    </mesh>
+  );
+}
+
+function Wall({ position }) {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="gray" />
+    </mesh>
+  );
+}
+
+function Floor() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
+      <planeGeometry args={[20, 20]} />
+      <meshStandardMaterial color="lightgreen" />
+    </mesh>
+  );
+}
+
+function Exit({ position, onReach }) {
+  const ref = useRef();
+
+  useFrame(() => {
+    if (ref.current) {
+      ref.current.rotation.y += 0.05;
+    }
+  });
+
+  return (
+    <mesh
+      ref={ref}
+      position={position}
+      onPointerOver={onReach}
+    >
+      <boxGeometry args={[0.5, 0.5, 0.5]} />
+      <meshStandardMaterial color="gold" />
+    </mesh>
+  );
+}
+
+export default function App() {
+  const [playerPos, setPlayerPos] = useState([0, 0, 0]);
+  const [won, setWon] = useState(false);
+
+  const mazeWalls = [
+    [-1, 0, -2], [0, 0, -2], [1, 0, -2],
+    [1, 0, -1],
+    [-1, 0, 0],
+    [0, 0, 1], [1, 0, 1],
+  ];
+
+  const handleReachExit = () => {
+    if (
+      Math.abs(playerPos[0] - 3) < 0.5 &&
+      Math.abs(playerPos[2] - 3) < 0.5
+    ) {
+      setWon(true);
+    }
+  };
+
+  return (
+    <div className="w-screen h-screen">
+      <Canvas camera={{ position: [0, 5, 10], fov: 50 }}>
+        <ambientLight />
+        <pointLight position={[10, 10, 10]} />
+        <OrbitControls />
+
+        <Floor />
+        {mazeWalls.map((pos, i) => (
+          <Wall key={i} position={pos} />
+        ))}
+
+        <Player position={playerPos} setPosition={setPlayerPos} />
+        <Exit position={[3, 0, 3]} onReach={handleReachExit} />
+      </Canvas>
+      {won && (
+        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-60 text-white text-4xl">
+          You escaped the maze!
+        </div>
+      )}
+    </div>
+  );
+}
